@@ -1,0 +1,318 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Calendario Partite Fenice</title>
+    <style>
+        body { font-family: Arial, sans-serif; background-color: #f4f4f9; color: #333; margin: 0; padding: 20px; }
+        h1 { text-align: center; color: #2E75B6; margin-bottom: 5px; }
+        .sub-sync { text-align: center; font-size: 0.85rem; color: #666; margin-bottom: 15px; }
+
+        .top-bar { width: 90%; max-width: 1200px; margin: 0 auto 15px auto; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px; background: white; padding: 12px 18px; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.08); }
+        
+        .status-badge { font-size: 0.9rem; padding: 5px 12px; border-radius: 20px; background: #eee; }
+        .status-verified { background: #d4edda; color: #155724; font-weight: bold; }
+        .status-unverified { background: #f8d7da; color: #721c24; }
+        .status-warning { background: #fff3cd; color: #856404; font-weight: bold; }
+
+        button { cursor: pointer; padding: 8px 14px; border: none; border-radius: 5px; font-weight: bold; font-size: 0.9rem; transition: 0.2s; }
+        .btn-primary { background-color: #2E75B6; color: white; }
+        .btn-primary:hover { background-color: #1f5282; }
+        .btn-danger { background-color: #dc3545; color: white; }
+        .btn-success { background-color: #28a745; color: white; }
+        .btn-success:hover { background-color: #218838; }
+
+        #auth-actions { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+
+        #admin-panel { display: none; width: 90%; max-width: 1200px; margin: 0 auto 20px auto; background: white; padding: 18px; border-radius: 8px; box-shadow: 0 4px 8px rgba(0,0,0,0.1); border-left: 5px solid #2E75B6; }
+        #admin-panel h3 { margin-top: 0; color: #2E75B6; }
+        .form-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 10px; }
+        .form-grid input, .form-grid select { padding: 8px; border: 1px solid #ccc; border-radius: 4px; font-size: 0.9rem; }
+        .btn-full-width { grid-column: 1 / -1; margin-top: 5px; }
+
+        table { width: 90%; max-width: 1200px; margin: 0 auto 30px auto; border-collapse: collapse; background: white; box-shadow: 0 4px 8px rgba(0,0,0,0.1); border-radius: 8px; overflow: hidden; font-size: 0.95rem; }
+        th, td { padding: 10px; text-align: left; border-bottom: 1px solid #ddd; }
+        th { background-color: #333; color: white; }
+        tr:hover { background-color: #f1f1f1; }
+        .in-casa { color: #2E75B6; font-weight: bold; }
+        .fuori-casa { color: #C00000; font-weight: bold; }
+        .risultato-badge { font-weight: bold; padding: 4px 8px; border-radius: 4px; background: #eef4fa; color: #2E75B6; }
+        .input-risultato { width: 80px; padding: 6px; border: 1px solid #bbb; border-radius: 4px; text-align: center; font-weight: bold; }
+        
+        .td-gara { font-weight: bold; color: #666; }
+        .td-via { font-size: 0.85rem; color: #555; max-width: 250px; line-height: 1.3; }
+    </style>
+</head>
+<body>
+
+    <h1>🏐 Calendario Fenice</h1>
+    <div class="sub-sync" id="sync-indicator">🔄 Sincronizzato in diretta con Google Drive</div>
+
+    <!-- Barra Login -->
+    <div class="top-bar">
+        <span id="user-status" class="status-badge">Modalità Visitatore (Sola lettura)</span>
+        
+        <div id="auth-actions">
+            <button id="btn-login" class="btn-primary">🔐 Accedi con Google per Modificare</button>
+            
+            <div id="pin-section" style="display: none; align-items: center; gap: 5px;">
+                <input type="password" id="input-pin" placeholder="Inserisci PIN" style="padding: 7px; width: 100px; border-radius: 4px; border: 1px solid #ccc;">
+                <button id="btn-conferma-pin" class="btn-success">Sblocca</button>
+            </div>
+            
+            <button id="btn-logout" class="btn-danger" style="display: none;">Esci</button>
+        </div>
+    </div>
+
+    <!-- Pannello Aggiunta Partita -->
+    <div id="admin-panel">
+        <h3>➕ Aggiungi Partita (Google Drive)</h3>
+        <form id="form-aggiungi">
+            <div class="form-grid">
+                <input type="text" id="nuovo-campionato" placeholder="Campionato (es. U15)" required>
+                <input type="text" id="nuova-gara" placeholder="N° Gara (es. 249)">
+                <input type="text" id="nuovo-giorno" placeholder="Giorno (es. 28/10/2026)" required>
+                <input type="text" id="nuova-ora" placeholder="Ora (es. 17.00)" required>
+                <select id="nuovo-luogo">
+                    <option value="In casa">In casa</option>
+                    <option value="Fuori casa">Fuori casa</option>
+                </select>
+                <input type="text" id="nuovo-avversario" placeholder="Avversario" required>
+                <input type="text" id="nuova-via" placeholder="Via / Indirizzo palestra">
+                <input type="text" id="nuovo-risultato" placeholder="Risultato (opzionale)">
+                <button type="submit" class="btn-primary btn-full-width">➕ Salva nel Foglio</button>
+            </div>
+        </form>
+    </div>
+
+    <!-- Tabella Partite -->
+    <div style="overflow-x: auto;">
+        <table>
+            <thead>
+                <tr>
+                    <th>Campionato</th>
+                    <th>N° Gara</th>
+                    <th>Giorno</th>
+                    <th>Ora</th>
+                    <th>Luogo</th>
+                    <th>Avversario</th>
+                    <th>Indirizzo (Via)</th>
+                    <th>Risultato</th>
+                    <th id="th-azioni" style="display: none;">Azioni</th>
+                </tr>
+            </thead>
+            <tbody id="tabella-partite">
+                <tr><td colspan="9" style="text-align:center;">Caricamento dal Foglio Google in corso...</td></tr>
+            </tbody>
+        </table>
+    </div>
+
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.0.0/firebase-app.js";
+        import { getAuth, GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChanged, browserSessionPersistence, setPersistence } from "https://www.gstatic.com/firebasejs/11.0.0/firebase-auth.js";
+
+        const firebaseConfig = {
+            apiKey: "AIzaSyAwdCnqiZ3qirg3M1nRDceq9y_VQ83ApOo",
+            authDomain: "calendario-fenice.firebaseapp.com",
+            projectId: "calendario-fenice",
+            storageBucket: "calendario-fenice.firebasestorage.app",
+            messagingSenderId: "292051376406",
+            appId: "1:292051376406:web:e821eeb0fa377caadc1837"
+        };
+
+        const URL_FOGLIO_GOOGLE = "https://script.google.com/macros/s/AKfycbxQBezj418eFn-CqdFEBEQGRbS4KLSk4uH1WUhQPHMM7ptPQ72jDDT8OTnyTi-_ZSDCZA/exec";
+
+        const EMAIL_VERIFICATE = [
+            "riccardonicchi27@gmail.com",
+            "mariannacoccimiglio@gmail.com"
+        ];
+
+        const PIN_SEGRETO = "1234";
+
+        const app = initializeApp(firebaseConfig);
+        const auth = getAuth(app);
+        const provider = new GoogleAuthProvider();
+
+        let emailCorrente = null;
+        let isVerificato = false;
+        let isSbloccato = false;
+        let partiteCache = [];
+        let ultimoJson = "";
+
+        setPersistence(auth, browserSessionPersistence);
+
+        document.getElementById('btn-login').onclick = () => signInWithPopup(auth, provider);
+        document.getElementById('btn-logout').onclick = () => signOut(auth);
+
+        onAuthStateChanged(auth, (user) => {
+            const statusEl = document.getElementById('user-status');
+            const adminPanel = document.getElementById('admin-panel');
+            const thAzioni = document.getElementById('th-azioni');
+            const pinSection = document.getElementById('pin-section');
+            const btnLogin = document.getElementById('btn-login');
+            const btnLogout = document.getElementById('btn-logout');
+
+            isSbloccato = false;
+            document.getElementById('input-pin').value = '';
+
+            if (user) {
+                emailCorrente = user.email.toLowerCase();
+
+                if (EMAIL_VERIFICATE.includes(emailCorrente)) {
+                    isVerificato = true;
+                    btnLogin.style.display = 'none';
+                    btnLogout.style.display = 'inline-block';
+                    
+                    pinSection.style.display = 'flex';
+                    adminPanel.style.display = 'none';
+                    thAzioni.style.display = 'none';
+                    
+                    statusEl.textContent = `🔒 In attesa di PIN (${emailCorrente})`;
+                    statusEl.className = "status-badge status-warning";
+                } else {
+                    isVerificato = false;
+                    btnLogin.style.display = 'none';
+                    btnLogout.style.display = 'inline-block';
+                    pinSection.style.display = 'none';
+                    adminPanel.style.display = 'none';
+                    thAzioni.style.display = 'none';
+                    
+                    statusEl.textContent = `⛔ Non autorizzato (${emailCorrente})`;
+                    statusEl.className = "status-badge status-unverified";
+                }
+            } else {
+                emailCorrente = null;
+                isVerificato = false;
+                btnLogin.style.display = 'inline-block';
+                btnLogout.style.display = 'none';
+                pinSection.style.display = 'none';
+                adminPanel.style.display = 'none';
+                thAzioni.style.display = 'none';
+                
+                statusEl.textContent = "Modalità Visitatore (Sola lettura)";
+                statusEl.className = "status-badge";
+            }
+            disegnaTabella();
+        });
+
+        document.getElementById('btn-conferma-pin').onclick = () => {
+            const pinIn = document.getElementById('input-pin').value;
+            
+            if (pinIn === PIN_SEGRETO) {
+                isSbloccato = true;
+                
+                document.getElementById('pin-section').style.display = 'none';
+                document.getElementById('admin-panel').style.display = 'block';
+                document.getElementById('th-azioni').style.display = 'table-cell';
+                
+                const statusEl = document.getElementById('user-status');
+                statusEl.textContent = `✅ Sbloccato: ${emailCorrente}`;
+                statusEl.className = "status-badge status-verified";
+                
+                disegnaTabella(); 
+            } else {
+                alert("PIN errato! Riprova.");
+                document.getElementById('input-pin').value = '';
+            }
+        };
+
+        async function leggiFoglioGoogle(forzaRidisegno = false) {
+            if (!forzaRidisegno && document.activeElement && document.activeElement.classList.contains('input-risultato')) {
+                return;
+            }
+            try {
+                const res = await fetch(URL_FOGLIO_GOOGLE + "?t=" + Date.now());
+                const dati = await res.json();
+                if (dati.status === "ok") {
+                    const nuovoJson = JSON.stringify(dati.partite);
+                    if (forzaRidisegno || nuovoJson !== ultimoJson) {
+                        ultimoJson = nuovoJson;
+                        partiteCache = dati.partite;
+                        disegnaTabella();
+                    }
+                    document.getElementById('sync-indicator').textContent = "✅ In diretta col Foglio Google (Ultimo controllo: " + new Date().toLocaleTimeString() + ")";
+                }
+            } catch (err) {
+                console.error("Errore lettura Foglio Google:", err);
+            }
+        }
+
+        function disegnaTabella() {
+            const tbody = document.getElementById('tabella-partite');
+            tbody.innerHTML = "";
+
+            partiteCache.forEach((p) => {
+                const tr = document.createElement('tr');
+                const classeLuogo = p.Luogo === 'In casa' ? 'in-casa' : 'fuori-casa';
+
+                let htmlRisultato = `<span class="risultato-badge">${p.Risultato || 'Da giocare'}</span>`;
+                let htmlAzioni = '';
+
+                if (isVerificato && isSbloccato) {
+                    htmlRisultato = `
+                        <input type="text" class="input-risultato" id="ris-${p.rigaExcel}" value="${p.Risultato}" placeholder="es. 3-1">
+                        <button class="btn-primary" onclick="salvaRisultato(${p.rigaExcel})">💾</button>
+                    `;
+                    htmlAzioni = `
+                        <td>
+                            <button class="btn-danger" onclick="eliminaRiga(${p.rigaExcel})" title="Elimina riga dal Foglio">🗑️</button>
+                        </td>
+                    `;
+                }
+
+                tr.innerHTML = `
+                    <td>${p.Campionato || ''}</td>
+                    <td class="td-gara">${p.Gara || ''}</td>
+                    <td>${p.Giorno || ''}</td>
+                    <td>${p.Ora || ''}</td>
+                    <td class="${classeLuogo}">${p.Luogo || ''}</td>
+                    <td>${p.Avversario || ''}</td>
+                    <td class="td-via">${p.Via || ''}</td>
+                    <td>${htmlRisultato}</td>
+                    ${htmlAzioni}
+                `;
+                tbody.appendChild(tr);
+            });
+        }
+
+        async function inviaAlFoglio(payload) {
+            document.getElementById('sync-indicator').textContent = "⏳ Salvataggio nel Foglio Google in corso...";
+            await fetch(URL_FOGLIO_GOOGLE, {
+                method: "POST",
+                body: JSON.stringify({ ...payload, email: emailCorrente })
+            });
+            await leggiFoglioGoogle(true);
+        }
+
+        window.salvaRisultato = async (rigaExcel) => {
+            const val = document.getElementById(`ris-${rigaExcel}`).value.trim();
+            await inviaAlFoglio({ azione: "aggiorna_risultato", rigaExcel: rigaExcel, risultato: val });
+        };
+
+        window.eliminaRiga = async (rigaExcel) => {
+            if (!confirm("Eliminare questa riga direttamente dal Foglio Google?")) return;
+            await inviaAlFoglio({ azione: "elimina_partita", rigaExcel: rigaExcel });
+        };
+
+        document.getElementById('form-aggiungi').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            await inviaAlFoglio({
+                azione: "aggiungi_partita",
+                Campionato: document.getElementById('nuovo-campionato').value.trim(),
+                Gara: document.getElementById('nuova-gara').value.trim(),
+                Giorno: document.getElementById('nuovo-giorno').value.trim(),
+                Ora: document.getElementById('nuova-ora').value.trim(),
+                Luogo: document.getElementById('nuovo-luogo').value,
+                Avversario: document.getElementById('nuovo-avversario').value.trim(),
+                Via: document.getElementById('nuova-via').value.trim(),
+                Risultato: document.getElementById('nuovo-risultato').value.trim()
+            });
+            e.target.reset();
+        });
+
+        leggiFoglioGoogle(true);
+        setInterval(() => leggiFoglioGoogle(false), 5000);
+    </script>
+</body>
+</html>
