@@ -22,6 +22,8 @@
         .btn-danger { background-color: #dc3545; color: white; }
         .btn-success { background-color: #28a745; color: white; }
         .btn-success:hover { background-color: #218838; }
+        .btn-warning { background-color: #ffc107; color: black; }
+        .btn-warning:hover { background-color: #e0a800; }
 
         #auth-actions { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
 
@@ -42,6 +44,10 @@
         
         .td-gara { font-weight: bold; color: #666; }
         .td-via { font-size: 0.85rem; color: #555; max-width: 250px; line-height: 1.3; }
+        
+        /* Stili per la modalità modifica riga */
+        .edit-mode input, .edit-mode select { width: 100%; padding: 6px; border: 1px solid #ccc; border-radius: 4px; box-sizing: border-box; font-size: 0.9rem; }
+        .action-buttons { display: flex; gap: 5px; flex-wrap: nowrap; }
     </style>
 </head>
 <body>
@@ -121,7 +127,6 @@
             appId: "1:292051376406:web:e821eeb0fa377caadc1837"
         };
 
-        // QUESTO È IL LINK CORRETTO DI APPS SCRIPT
         const URL_FOGLIO_GOOGLE = "https://script.google.com/macros/s/AKfycbx5aBIP3gpxQi6A8w1ehN3slKgNtmmKyG5DiN5aaVXMXg6kJJITQRBqdekpBNHIX44ovw/exec";
 
         const EMAIL_VERIFICATE = [
@@ -140,6 +145,7 @@
         let isSbloccato = false;
         let partiteCache = [];
         let ultimoJson = "";
+        let rigaInModifica = null; // Memorizza la riga che stiamo modificando
 
         setPersistence(auth, browserSessionPersistence);
 
@@ -155,6 +161,7 @@
             const btnLogout = document.getElementById('btn-logout');
 
             isSbloccato = false;
+            rigaInModifica = null;
             document.getElementById('input-pin').value = '';
 
             if (user) {
@@ -219,7 +226,8 @@
         };
 
         async function leggiFoglioGoogle(forzaRidisegno = false) {
-            if (!forzaRidisegno && document.activeElement && document.activeElement.classList.contains('input-risultato')) {
+            // Blocca il refresh automatico se si sta digitando o modificando un'intera riga
+            if (!forzaRidisegno && (rigaInModifica !== null || (document.activeElement && document.activeElement.classList.contains('input-risultato')))) {
                 return;
             }
             try {
@@ -245,34 +253,61 @@
 
             partiteCache.forEach((p) => {
                 const tr = document.createElement('tr');
-                const classeLuogo = p.Luogo === 'In casa' ? 'in-casa' : 'fuori-casa';
 
-                let htmlRisultato = `<span class="risultato-badge">${p.Risultato || 'Da giocare'}</span>`;
-                let htmlAzioni = '';
-
-                if (isVerificato && isSbloccato) {
-                    htmlRisultato = `
-                        <input type="text" class="input-risultato" id="ris-${p.rigaExcel}" value="${p.Risultato}" placeholder="es. 3-1">
-                        <button class="btn-primary" onclick="salvaRisultato(${p.rigaExcel})">💾</button>
-                    `;
-                    htmlAzioni = `
+                // SE LA RIGA È IN MODIFICA COMPLETA
+                if (isVerificato && isSbloccato && rigaInModifica === p.rigaExcel) {
+                    tr.className = 'edit-mode';
+                    tr.innerHTML = `
+                        <td><input type="text" id="edit-camp-${p.rigaExcel}" value="${p.Campionato || ''}"></td>
+                        <td><input type="text" id="edit-gara-${p.rigaExcel}" value="${p.Gara || ''}"></td>
+                        <td><input type="text" id="edit-giorno-${p.rigaExcel}" value="${p.Giorno || ''}"></td>
+                        <td><input type="text" id="edit-ora-${p.rigaExcel}" value="${p.Ora || ''}"></td>
                         <td>
-                            <button class="btn-danger" onclick="eliminaRiga(${p.rigaExcel})" title="Elimina riga dal Foglio">🗑️</button>
+                            <select id="edit-luogo-${p.rigaExcel}">
+                                <option value="In casa" ${p.Luogo === 'In casa' ? 'selected' : ''}>In casa</option>
+                                <option value="Fuori casa" ${p.Luogo === 'Fuori casa' ? 'selected' : ''}>Fuori casa</option>
+                            </select>
+                        </td>
+                        <td><input type="text" id="edit-avv-${p.rigaExcel}" value="${p.Avversario || ''}"></td>
+                        <td><input type="text" id="edit-via-${p.rigaExcel}" value="${p.Via || ''}"></td>
+                        <td><input type="text" id="edit-ris-${p.rigaExcel}" value="${p.Risultato || ''}"></td>
+                        <td class="action-buttons">
+                            <button class="btn-success" onclick="salvaModificaCompleta(${p.rigaExcel})" title="Salva modifiche">💾</button>
+                            <button class="btn-danger" onclick="annullaModifica()" title="Annulla">❌</button>
                         </td>
                     `;
-                }
+                } 
+                // SE LA RIGA È NORMALE
+                else {
+                    const classeLuogo = p.Luogo === 'In casa' ? 'in-casa' : 'fuori-casa';
+                    let htmlRisultato = `<span class="risultato-badge">${p.Risultato || 'Da giocare'}</span>`;
+                    let htmlAzioni = '';
 
-                tr.innerHTML = `
-                    <td>${p.Campionato || ''}</td>
-                    <td class="td-gara">${p.Gara || ''}</td>
-                    <td>${p.Giorno || ''}</td>
-                    <td>${p.Ora || ''}</td>
-                    <td class="${classeLuogo}">${p.Luogo || ''}</td>
-                    <td>${p.Avversario || ''}</td>
-                    <td class="td-via">${p.Via || ''}</td>
-                    <td>${htmlRisultato}</td>
-                    ${htmlAzioni}
-                `;
+                    if (isVerificato && isSbloccato) {
+                        htmlRisultato = `
+                            <input type="text" class="input-risultato" id="ris-${p.rigaExcel}" value="${p.Risultato || ''}" placeholder="es. 3-1">
+                            <button class="btn-primary" onclick="salvaRisultato(${p.rigaExcel})" title="Salva solo risultato">💾</button>
+                        `;
+                        htmlAzioni = `
+                            <td class="action-buttons">
+                                <button class="btn-warning" onclick="abilitaModifica(${p.rigaExcel})" title="Modifica tutta la partita">✏️</button>
+                                <button class="btn-danger" onclick="eliminaRiga(${p.rigaExcel})" title="Elimina riga dal Foglio">🗑️</button>
+                            </td>
+                        `;
+                    }
+
+                    tr.innerHTML = `
+                        <td>${p.Campionato || ''}</td>
+                        <td class="td-gara">${p.Gara || ''}</td>
+                        <td>${p.Giorno || ''}</td>
+                        <td>${p.Ora || ''}</td>
+                        <td class="${classeLuogo}">${p.Luogo || ''}</td>
+                        <td>${p.Avversario || ''}</td>
+                        <td class="td-via">${p.Via || ''}</td>
+                        <td>${htmlRisultato}</td>
+                        ${htmlAzioni}
+                    `;
+                }
                 tbody.appendChild(tr);
             });
         }
@@ -286,6 +321,35 @@
             await leggiFoglioGoogle(true);
         }
 
+        // Funzioni per la modifica completa
+        window.abilitaModifica = (rigaExcel) => {
+            rigaInModifica = rigaExcel;
+            disegnaTabella();
+        };
+
+        window.annullaModifica = () => {
+            rigaInModifica = null;
+            disegnaTabella();
+        };
+
+        window.salvaModificaCompleta = async (rigaExcel) => {
+            const payload = {
+                azione: "modifica_partita_completa",
+                rigaExcel: rigaExcel,
+                Campionato: document.getElementById(`edit-camp-${rigaExcel}`).value.trim(),
+                Gara: document.getElementById(`edit-gara-${rigaExcel}`).value.trim(),
+                Giorno: document.getElementById(`edit-giorno-${rigaExcel}`).value.trim(),
+                Ora: document.getElementById(`edit-ora-${rigaExcel}`).value.trim(),
+                Luogo: document.getElementById(`edit-luogo-${rigaExcel}`).value,
+                Avversario: document.getElementById(`edit-avv-${rigaExcel}`).value.trim(),
+                Via: document.getElementById(`edit-via-${rigaExcel}`).value.trim(),
+                Risultato: document.getElementById(`edit-ris-${rigaExcel}`).value.trim()
+            };
+            rigaInModifica = null; // Chiudi la modalità modifica
+            await inviaAlFoglio(payload);
+        };
+
+        // Vecchie funzioni
         window.salvaRisultato = async (rigaExcel) => {
             const val = document.getElementById(`ris-${rigaExcel}`).value.trim();
             await inviaAlFoglio({ azione: "aggiorna_risultato", rigaExcel: rigaExcel, risultato: val });
