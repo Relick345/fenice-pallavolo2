@@ -45,7 +45,6 @@
         .td-gara { font-weight: bold; color: #666; }
         .td-via { font-size: 0.85rem; color: #555; max-width: 250px; line-height: 1.3; }
         
-        /* Stili per la modalità modifica riga */
         .edit-mode input, .edit-mode select { width: 100%; padding: 6px; border: 1px solid #ccc; border-radius: 4px; box-sizing: border-box; font-size: 0.9rem; }
         .action-buttons { display: flex; gap: 5px; flex-wrap: nowrap; }
     </style>
@@ -127,7 +126,8 @@
             appId: "1:292051376406:web:e821eeb0fa377caadc1837"
         };
 
-        const URL_FOGLIO_GOOGLE = "https://script.google.com/macros/s/AKfycbx5aBIP3gpxQi6A8w1ehN3slKgNtmmKyG5DiN5aaVXMXg6kJJITQRBqdekpBNHIX44ovw/exec";
+        // IL NUOVO LINK GENERATO DA APPS SCRIPT
+        const URL_FOGLIO_GOOGLE = "https://script.google.com/macros/s/AKfycbwdQgmdChgHs9Yx-litI97noBMLK8W3n8sUJNy7PKwnmRlGv2SLMRq0VuWMvYqGqpO-JA/exec";
 
         const EMAIL_VERIFICATE = [
             "riccardonicchi27@gmail.com",
@@ -145,9 +145,13 @@
         let isSbloccato = false;
         let partiteCache = [];
         let ultimoJson = "";
-        let rigaInModifica = null; // Memorizza la riga che stiamo modificando
+        let rigaInModifica = null; 
 
         setPersistence(auth, browserSessionPersistence);
+
+        function escapeHtml(text) {
+            return (text || "").toString().replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#039;");
+        }
 
         document.getElementById('btn-login').onclick = () => signInWithPopup(auth, provider);
         document.getElementById('btn-logout').onclick = () => signOut(auth);
@@ -171,7 +175,6 @@
                     isVerificato = true;
                     btnLogin.style.display = 'none';
                     btnLogout.style.display = 'inline-block';
-                    
                     pinSection.style.display = 'flex';
                     adminPanel.style.display = 'none';
                     thAzioni.style.display = 'none';
@@ -206,10 +209,8 @@
 
         document.getElementById('btn-conferma-pin').onclick = () => {
             const pinIn = document.getElementById('input-pin').value;
-            
             if (pinIn === PIN_SEGRETO) {
                 isSbloccato = true;
-                
                 document.getElementById('pin-section').style.display = 'none';
                 document.getElementById('admin-panel').style.display = 'block';
                 document.getElementById('th-azioni').style.display = 'table-cell';
@@ -217,7 +218,6 @@
                 const statusEl = document.getElementById('user-status');
                 statusEl.textContent = `✅ Sbloccato: ${emailCorrente}`;
                 statusEl.className = "status-badge status-verified";
-                
                 disegnaTabella(); 
             } else {
                 alert("PIN errato! Riprova.");
@@ -226,7 +226,6 @@
         };
 
         async function leggiFoglioGoogle(forzaRidisegno = false) {
-            // Blocca il refresh automatico se si sta digitando o modificando un'intera riga
             if (!forzaRidisegno && (rigaInModifica !== null || (document.activeElement && document.activeElement.classList.contains('input-risultato')))) {
                 return;
             }
@@ -254,38 +253,35 @@
             partiteCache.forEach((p) => {
                 const tr = document.createElement('tr');
 
-                // SE LA RIGA È IN MODIFICA COMPLETA
                 if (isVerificato && isSbloccato && rigaInModifica === p.rigaExcel) {
                     tr.className = 'edit-mode';
                     tr.innerHTML = `
-                        <td><input type="text" id="edit-camp-${p.rigaExcel}" value="${p.Campionato || ''}"></td>
-                        <td><input type="text" id="edit-gara-${p.rigaExcel}" value="${p.Gara || ''}"></td>
-                        <td><input type="text" id="edit-giorno-${p.rigaExcel}" value="${p.Giorno || ''}"></td>
-                        <td><input type="text" id="edit-ora-${p.rigaExcel}" value="${p.Ora || ''}"></td>
+                        <td><input type="text" id="edit-camp-${p.rigaExcel}" value="${escapeHtml(p.Campionato)}"></td>
+                        <td><input type="text" id="edit-gara-${p.rigaExcel}" value="${escapeHtml(p.Gara)}"></td>
+                        <td><input type="text" id="edit-giorno-${p.rigaExcel}" value="${escapeHtml(p.Giorno)}"></td>
+                        <td><input type="text" id="edit-ora-${p.rigaExcel}" value="${escapeHtml(p.Ora)}"></td>
                         <td>
                             <select id="edit-luogo-${p.rigaExcel}">
                                 <option value="In casa" ${p.Luogo === 'In casa' ? 'selected' : ''}>In casa</option>
                                 <option value="Fuori casa" ${p.Luogo === 'Fuori casa' ? 'selected' : ''}>Fuori casa</option>
                             </select>
                         </td>
-                        <td><input type="text" id="edit-avv-${p.rigaExcel}" value="${p.Avversario || ''}"></td>
-                        <td><input type="text" id="edit-via-${p.rigaExcel}" value="${p.Via || ''}"></td>
-                        <td><input type="text" id="edit-ris-${p.rigaExcel}" value="${p.Risultato || ''}"></td>
+                        <td><input type="text" id="edit-avv-${p.rigaExcel}" value="${escapeHtml(p.Avversario)}"></td>
+                        <td><input type="text" id="edit-via-${p.rigaExcel}" value="${escapeHtml(p.Via)}"></td>
+                        <td><input type="text" id="edit-ris-${p.rigaExcel}" value="${escapeHtml(p.Risultato)}"></td>
                         <td class="action-buttons">
                             <button class="btn-success" onclick="salvaModificaCompleta(${p.rigaExcel})" title="Salva modifiche">💾</button>
                             <button class="btn-danger" onclick="annullaModifica()" title="Annulla">❌</button>
                         </td>
                     `;
-                } 
-                // SE LA RIGA È NORMALE
-                else {
+                } else {
                     const classeLuogo = p.Luogo === 'In casa' ? 'in-casa' : 'fuori-casa';
-                    let htmlRisultato = `<span class="risultato-badge">${p.Risultato || 'Da giocare'}</span>`;
+                    let htmlRisultato = `<span class="risultato-badge">${escapeHtml(p.Risultato) || 'Da giocare'}</span>`;
                     let htmlAzioni = '';
 
                     if (isVerificato && isSbloccato) {
                         htmlRisultato = `
-                            <input type="text" class="input-risultato" id="ris-${p.rigaExcel}" value="${p.Risultato || ''}" placeholder="es. 3-1">
+                            <input type="text" class="input-risultato" id="ris-${p.rigaExcel}" value="${escapeHtml(p.Risultato)}" placeholder="es. 3-1">
                             <button class="btn-primary" onclick="salvaRisultato(${p.rigaExcel})" title="Salva solo risultato">💾</button>
                         `;
                         htmlAzioni = `
@@ -297,13 +293,13 @@
                     }
 
                     tr.innerHTML = `
-                        <td>${p.Campionato || ''}</td>
-                        <td class="td-gara">${p.Gara || ''}</td>
-                        <td>${p.Giorno || ''}</td>
-                        <td>${p.Ora || ''}</td>
-                        <td class="${classeLuogo}">${p.Luogo || ''}</td>
-                        <td>${p.Avversario || ''}</td>
-                        <td class="td-via">${p.Via || ''}</td>
+                        <td>${escapeHtml(p.Campionato)}</td>
+                        <td class="td-gara">${escapeHtml(p.Gara)}</td>
+                        <td>${escapeHtml(p.Giorno)}</td>
+                        <td>${escapeHtml(p.Ora)}</td>
+                        <td class="${classeLuogo}">${escapeHtml(p.Luogo)}</td>
+                        <td>${escapeHtml(p.Avversario)}</td>
+                        <td class="td-via">${escapeHtml(p.Via)}</td>
                         <td>${htmlRisultato}</td>
                         ${htmlAzioni}
                     `;
@@ -312,16 +308,6 @@
             });
         }
 
-        async function inviaAlFoglio(payload) {
-            document.getElementById('sync-indicator').textContent = "⏳ Salvataggio nel Foglio Google in corso...";
-            await fetch(URL_FOGLIO_GOOGLE, {
-                method: "POST",
-                body: JSON.stringify({ ...payload, email: emailCorrente })
-            });
-            await leggiFoglioGoogle(true);
-        }
-
-        // Funzioni per la modifica completa
         window.abilitaModifica = (rigaExcel) => {
             rigaInModifica = rigaExcel;
             disegnaTabella();
@@ -345,11 +331,28 @@
                 Via: document.getElementById(`edit-via-${rigaExcel}`).value.trim(),
                 Risultato: document.getElementById(`edit-ris-${rigaExcel}`).value.trim()
             };
-            rigaInModifica = null; // Chiudi la modalità modifica
-            await inviaAlFoglio(payload);
+            
+            document.getElementById('sync-indicator').textContent = "⏳ Salvataggio in corso...";
+            
+            try {
+                const req = await fetch(URL_FOGLIO_GOOGLE, {
+                    method: "POST",
+                    body: JSON.stringify({ ...payload, email: emailCorrente })
+                });
+                const res = await req.json();
+                
+                if (res.status === "errore") {
+                    alert("Errore dal server Google: " + res.messaggio);
+                } else {
+                    rigaInModifica = null; // Chiudi la modifica solo in caso di successo!
+                    await leggiFoglioGoogle(true);
+                }
+            } catch (err) {
+                alert("Errore di connessione. Riprova.");
+                console.error(err);
+            }
         };
 
-        // Vecchie funzioni
         window.salvaRisultato = async (rigaExcel) => {
             const val = document.getElementById(`ris-${rigaExcel}`).value.trim();
             await inviaAlFoglio({ azione: "aggiorna_risultato", rigaExcel: rigaExcel, risultato: val });
@@ -359,6 +362,24 @@
             if (!confirm("Eliminare questa riga direttamente dal Foglio Google?")) return;
             await inviaAlFoglio({ azione: "elimina_partita", rigaExcel: rigaExcel });
         };
+
+        async function inviaAlFoglio(payload) {
+            document.getElementById('sync-indicator').textContent = "⏳ Salvataggio in corso...";
+            try {
+                const req = await fetch(URL_FOGLIO_GOOGLE, {
+                    method: "POST",
+                    body: JSON.stringify({ ...payload, email: emailCorrente })
+                });
+                const res = await req.json();
+                if (res.status === "errore") {
+                    alert("Errore dal server Google: " + res.messaggio);
+                }
+            } catch (err) {
+                alert("Errore di connessione.");
+                console.error(err);
+            }
+            await leggiFoglioGoogle(true);
+        }
 
         document.getElementById('form-aggiungi').addEventListener('submit', async (e) => {
             e.preventDefault();
